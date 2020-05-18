@@ -1,0 +1,19 @@
+[package]
+name = "test-project"
+version = "0.1.0"
+authors = ["Michael Mogenson <michael.mogenson@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+gba = { git = "https://github.com/rust-console/gba" }
+
+[dev-dependencies]
+cargo-make = "0.30"
+cargo-xbuild = "0.5"
+gbafix = "1.0"
+
+[profile.release]
+codegen-units = 1
+incremental = false
+lto = true
+panic = "abort"

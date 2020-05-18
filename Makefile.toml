@@ -1,0 +1,29 @@
+[config]
+skip_core_tasks = true
+
+[tasks.assemble]
+script = [
+    "mkdir -p target",
+    "arm-none-eabi-as crt0.s -o target/crt0.o"
+]
+
+[tasks.build]
+dependencies = ["assemble"]
+toolchain = "nightly"
+command = "cargo"
+args = ["xbuild", "--target", "thumbv4-none-agb.json", "--release"]
+
+[tasks.rom]
+dependencies = ["build"]
+script = [
+    "arm-none-eabi-objcopy -O binary target/thumbv4-none-agb/release/${CARGO_MAKE_PROJECT_NAME} target/${CARGO_MAKE_PROJECT_NAME}.gba",
+    "gbafix target/${CARGO_MAKE_PROJECT_NAME}.gba"
+]
+
+[tasks.mgba]
+dependencies = ["rom"]
+command = "mgba"
+args = ["--log-level=16", "target/${CARGO_MAKE_PROJECT_NAME}.gba"]
+
+[tasks.default]
+alias = "rom"
