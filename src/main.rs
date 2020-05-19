@@ -3,10 +3,10 @@
 #![forbid(unsafe_code)]
 
 use gba::{
-    fatal,
-    debug,
+    debug, fatal,
     io::{
-        display::{DisplayControlSetting, DisplayMode, DISPCNT, VBLANK_SCANLINE, VCOUNT},
+        display::{DisplayControlSetting, DisplayMode, DisplayStatusSetting, DISPCNT, DISPSTAT},
+        irq::{set_irq_handler, IrqEnableSetting, IrqFlags, BIOS_IF, IE, IME},
         keypad::read_key_input,
     },
     vram::bitmap::Mode3,
@@ -15,42 +15,38 @@ use gba::{
 
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
-    // This kills the emulation with a message if we're running within mGBA.
     fatal!("{}", info);
-    // If we're _not_ running within mGBA then we still need to not return, so
-    // loop forever doing nothing.
     loop {}
 }
 
-/// Performs a busy loop until VBlank starts.
-///
-/// This is very inefficient, and please keep following the lessons until we
-/// cover how interrupts work!
-pub fn spin_until_vblank() {
-    while VCOUNT.read() < VBLANK_SCANLINE {}
-}
-
-/// Performs a busy loop until VDraw starts.
-///
-/// This is very inefficient, and please keep following the lessons until we
-/// cover how interrupts work!
-pub fn spin_until_vdraw() {
-    while VCOUNT.read() >= VBLANK_SCANLINE {}
-}
+const WHITE: Color = Color::from_rgb(31, 31, 31);
+const RED: Color = Color::from_rgb(31, 0, 0);
 
 #[start]
 fn main(_argc: isize, _argv: *const *const u8) -> isize {
-    debug!("Hello World");
-    const SETTING: DisplayControlSetting = DisplayControlSetting::new()
-        .with_mode(DisplayMode::Mode3)
-        .with_bg2(true);
-    DISPCNT.write(SETTING);
+    debug!("starting");
+
+    // setup display
+    DISPCNT.write(
+        DisplayControlSetting::new()
+            .with_mode(DisplayMode::Mode3)
+            .with_bg2(true),
+    );
+    DISPSTAT.write(DisplayStatusSetting::new().with_vblank_irq_enable(true));
+    Mode3::dma_clear_to(WHITE);
 
     let mut px = Mode3::WIDTH / 2;
     let mut py = Mode3::HEIGHT / 2;
-    let mut color = Color::from_rgb(31, 0, 0);
+    let mut color = RED;
+
+    // enable interrupts
+    set_irq_handler(irq_handler);
+    IE.write(IrqFlags::new().with_vblank(true));
+    IME.write(IrqEnableSetting::IRQ_YES);
 
     loop {
+        gba::bios::vblank_interrupt_wait();
+
         // read our keys for this frame
         let this_frame_keys = read_key_input();
 
@@ -64,13 +60,10 @@ fn main(_argc: isize, _argv: *const *const u8) -> isize {
             color = Color(color.0.rotate_right(5));
         }
 
-        // now we wait
-        spin_until_vblank();
-
         // draw the new game and wait until the next frame starts.
         if px >= Mode3::WIDTH || py >= Mode3::HEIGHT {
             // out of bounds, reset the screen and position.
-            Mode3::dma_clear_to(Color::from_rgb(0, 0, 0));
+            Mode3::dma_clear_to(WHITE);
             px = Mode3::WIDTH / 2;
             py = Mode3::HEIGHT / 2;
         } else {
@@ -80,8 +73,11 @@ fn main(_argc: isize, _argv: *const *const u8) -> isize {
             Mode3::write(px + 1, py, color);
             Mode3::write(px + 1, py + 1, color);
         }
+    }
+}
 
-        // now we wait again
-        spin_until_vdraw();
+extern "C" fn irq_handler(flags: IrqFlags) {
+    if flags.vblank() {
+        BIOS_IF.write(BIOS_IF.read().with_vblank(true)); // clear vblank flag
     }
 }
