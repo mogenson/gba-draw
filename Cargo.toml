@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 gba = { git = "https://github.com/rust-console/gba" }
+embedded-graphics = "0.6.2"
 
 [dev-dependencies]
 cargo-make = "0.30"
