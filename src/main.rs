@@ -20,7 +20,7 @@ use gba::{
     debug, fatal,
     io::{
         display::{DisplayStatusSetting, DISPSTAT},
-        irq::{set_irq_handler, IrqEnableSetting, IrqFlags, BIOS_IF, IE, IME},
+        irq::{set_irq_handler, IrqEnableSetting, IrqFlags, BIOS_IF, IE, IF, IME},
         keypad::read_key_input,
     },
 };
@@ -77,6 +77,7 @@ fn main(_argc: isize, _argv: *const *const u8) -> isize {
 extern "C" fn irq_handler(flags: IrqFlags) {
     if flags.vblank() {
         BIOS_IF.write(BIOS_IF.read().with_vblank(true)); // clear vblank flag
+        IF.write(IF.read().with_vblank(true));
     }
 }
 
@@ -91,7 +92,7 @@ fn draw_text(display: &mut GbaDisplay) -> Result<(), core::convert::Infallible> 
     Text::new("Dirty Fucking Amy", Point::new(20, 20))
         .into_styled(TextStyle::new(Font12x16, Bgr555::CYAN))
         .draw(display)?;
-    Rectangle::new(Point::new(15, 15), Size::new(212, 24))
+    Rectangle::new(Point::new(15, 15), Point::new(227, 39))
         .into_styled(PrimitiveStyle::with_stroke(Bgr555::CYAN, 3))
         .draw(display)?;
     Ok(())
