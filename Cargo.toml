@@ -1,5 +1,5 @@
 [package]
-name = "test-project"
+name = "amy-gba"
 version = "0.1.0"
 authors = ["Michael Mogenson <michael.mogenson@gmail.com>"]
 edition = "2018"
