@@ -6,7 +6,13 @@ edition = "2018"
 
 [dependencies]
 gba = { git = "https://github.com/rust-console/gba" }
-embedded-graphics = "0.6.2"
+#embedded-graphics = "0.6.2"
+embedded-graphics = { path = "../embedded-graphics/embedded-graphics" }
+#tinytga = { version = "0.3.2", features = ["graphics"] }
+tinytga = { path = "../embedded-graphics/tinytga", features = ["graphics"] }
+#memchr = { version = "2.3.3", default-features = false }
+#memchr = { path = "../rust-memchr", default-features = false }
+#memchr = { git = "https://github.com/BurntSushi/rust-memchr.git", default-features = false }
 
 [dev-dependencies]
 cargo-make = "0.30"

@@ -8,10 +8,11 @@ use gba_display::GbaDisplay;
 use core::convert::{TryFrom, TryInto};
 
 use embedded_graphics::{
-    fonts::{Font6x8, Text},
+    fonts::{Font12x16, Text},
+    image::Image,
     pixelcolor::Bgr555,
     prelude::*,
-    primitives::{Circle, Rectangle, Triangle},
+    primitives::{Circle, Rectangle},
     style::{PrimitiveStyle, TextStyle},
 };
 
@@ -24,6 +25,8 @@ use gba::{
     },
 };
 
+use tinytga::Tga;
+
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
     fatal!("{}", info);
@@ -34,7 +37,8 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
 fn main(_argc: isize, _argv: *const *const u8) -> isize {
     debug!("Creating EG display");
     let mut display = GbaDisplay::new();
-    eg_draw(&mut display).ok();
+    draw_tga(&mut display).ok();
+    draw_text(&mut display).ok();
 
     debug!("Enabling interrupts");
     set_irq_handler(irq_handler);
@@ -63,7 +67,8 @@ fn main(_argc: isize, _argv: *const *const u8) -> isize {
                 .draw(&mut display)
                 .ok();
         } else {
-            display.clear(Bgr555::WHITE).ok();
+            draw_tga(&mut display).ok();
+            draw_text(&mut display).ok();
             point = Point::try_from((WIDTH, HEIGHT)).unwrap() / 2;
         }
     }
@@ -75,48 +80,19 @@ extern "C" fn irq_handler(flags: IrqFlags) {
     }
 }
 
-fn eg_draw(display: &mut GbaDisplay) -> Result<(), core::convert::Infallible> {
-    // Create styles used by the drawing operations.
-    let thin_stroke = PrimitiveStyle::with_stroke(Bgr555::CYAN, 1);
-    let thick_stroke = PrimitiveStyle::with_stroke(Bgr555::CYAN, 3);
-    let fill = PrimitiveStyle::with_fill(Bgr555::CYAN);
-    let text_style = TextStyle::new(Font6x8, Bgr555::CYAN);
+fn draw_tga(display: &mut GbaDisplay) -> Result<(), core::convert::Infallible> {
+    let tga = Tga::from_slice(include_bytes!("../assets/amy.tga")).unwrap();
+    let image: Image<Tga, Bgr555> = Image::new(&tga, Point::zero());
+    image.draw(display)?;
+    Ok(())
+}
 
-    let yoffset = 10;
-    display.clear(Bgr555::WHITE)?;
-
-    // Draw a 3px wide outline around the display.
-    let bottom_right = Point::zero() + display.size() - Point::new(1, 1);
-    Rectangle::new(Point::zero(), bottom_right)
-        .into_styled(thick_stroke)
+fn draw_text(display: &mut GbaDisplay) -> Result<(), core::convert::Infallible> {
+    Text::new("Dirty Fucking Amy", Point::new(20, 20))
+        .into_styled(TextStyle::new(Font12x16, Bgr555::CYAN))
         .draw(display)?;
-
-    // Draw a triangle.
-    Triangle::new(
-        Point::new(16, 16 + yoffset),
-        Point::new(16 + 16, 16 + yoffset),
-        Point::new(16 + 8, yoffset),
-    )
-    .into_styled(thin_stroke)
-    .draw(display)?;
-
-    // Draw a filled square
-    Rectangle::new(Point::new(52, yoffset), Point::new(52 + 16, 16 + yoffset))
-        .into_styled(fill)
+    Rectangle::new(Point::new(15, 15), Size::new(212, 24))
+        .into_styled(PrimitiveStyle::with_stroke(Bgr555::CYAN, 3))
         .draw(display)?;
-
-    // Draw a circle with a 3px wide stroke.
-    let radius = 8;
-    Circle::new(Point::new(88 + radius, yoffset + radius), radius as u32)
-        .into_styled(thick_stroke)
-        .draw(display)?;
-
-    // Draw centered text.
-    let text = "embedded-graphics";
-    let width = text.len() as i32 * 6;
-    Text::new(text, Point::new(64 - width / 2, 40))
-        .into_styled(text_style)
-        .draw(display)?;
-
     Ok(())
 }
