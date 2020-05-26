@@ -1,11 +1,11 @@
 [package]
-name = "amy-gba"
+name = "gba-draw"
 version = "0.1.0"
 authors = ["Michael Mogenson <michael.mogenson@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-gba = { git = "https://github.com/rust-console/gba" }
+gba = { git = "https://github.com/rust-console/gba.git" }
 embedded-graphics = "0.6.2"
 tinytga = { version = "0.3.2", features = ["graphics"] }
 
@@ -15,6 +15,7 @@ gbafix = "1.0"
 # cargo-make = "0.30" <- This breaks build by adding the use_std feature flag to memchr!
 
 [profile.release]
+opt-level = "s"
 codegen-units = 1
 incremental = false
 lto = true
