@@ -10,11 +10,13 @@ use gba_display::{GbaDisplay, PaletteColor};
 use core::convert::{Infallible, TryFrom, TryInto};
 
 use embedded_graphics::{
+    egtriangle,
     fonts::{Font12x16, Text},
     image::Image,
     pixelcolor::Bgr555,
     prelude::*,
-    primitives::{Circle, Line, Rectangle},
+    primitive_style,
+    primitives::Rectangle,
     style::{PrimitiveStyle, TextStyle},
 };
 
@@ -32,6 +34,17 @@ use gba::{
 };
 
 use tinytga::Tga;
+
+const COLORS: [Bgr555; 8] = [
+    Bgr555::BLACK,
+    Bgr555::RED,
+    Bgr555::GREEN,
+    Bgr555::BLUE,
+    Bgr555::YELLOW,
+    Bgr555::MAGENTA,
+    Bgr555::CYAN,
+    Bgr555::WHITE,
+];
 
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
@@ -54,8 +67,8 @@ fn main(_argc: isize, _argv: *const *const u8) -> isize {
     debug!("Register palette");
     register_palette();
 
-    debug!("Draw reticle");
-    draw_reticle().ok();
+    debug!("Draw cursor");
+    draw_cursor().ok();
 
     debug!("Create display");
     let mut display = GbaDisplay;
@@ -75,6 +88,8 @@ fn main(_argc: isize, _argv: *const *const u8) -> isize {
     debug!("Start main loop");
     DISPCNT.write(DISPCNT.read().with_force_vblank(false)); // enable display
 
+    let mut color_index = 0;
+
     loop {
         // sleep until vblank interrupt
         gba::bios::vblank_interrupt_wait();
@@ -82,19 +97,32 @@ fn main(_argc: isize, _argv: *const *const u8) -> isize {
         // read buttons input
         let input = read_key_input();
 
+        // cycle cursor
+        if input.b() {
+            color_index += 1;
+            if color_index >= COLORS.len() {
+                color_index = 0;
+            }
+        }
+
         // adjust game state and wait for vblank
         let offset = Point::new(input.x_tribool() as i32, input.y_tribool() as i32);
         point += offset;
 
         if let Ok((x @ 0..WIDTH, y @ 0..HEIGHT)) = point.try_into() {
-            move_reticle(x as u16, y as u16);
+            move_cursor(color_index as u16, x as u16, y as u16);
             if input.a() {
-                Pixel(Point::new(x as i32, y as i32), Bgr555::BLUE)
+                Pixel(Point::new(x as i32, y as i32), COLORS[color_index])
                     .draw(&mut display)
                     .ok();
             }
         } else {
             point -= offset; // undo
+        }
+
+        // wait for button to be released
+        while read_key_input().b() {
+            gba::bios::vblank_interrupt_wait();
         }
     }
 }
@@ -125,46 +153,35 @@ fn draw_text(display: &mut GbaDisplay) -> Result<(), Infallible> {
 
 fn register_palette() {
     // slot 0 is for transparency
-    index_palram_obj_8bpp(1).write(Color(Bgr555::BLACK.into_storage()));
-    index_palram_obj_8bpp(2).write(Color(Bgr555::RED.into_storage()));
-    index_palram_obj_8bpp(3).write(Color(Bgr555::GREEN.into_storage()));
-    index_palram_obj_8bpp(4).write(Color(Bgr555::BLUE.into_storage()));
-    index_palram_obj_8bpp(5).write(Color(Bgr555::YELLOW.into_storage()));
-    index_palram_obj_8bpp(6).write(Color(Bgr555::MAGENTA.into_storage()));
-    index_palram_obj_8bpp(7).write(Color(Bgr555::CYAN.into_storage()));
-    index_palram_obj_8bpp(8).write(Color(Bgr555::WHITE.into_storage()));
+    for (i, color) in COLORS.iter().enumerate() {
+        index_palram_obj_8bpp(i as u8 + 1).write(Color(color.into_storage()));
+    }
 }
 
-fn draw_reticle() -> Result<(), Infallible> {
+fn draw_cursor() -> Result<(), Infallible> {
     let mut tile = Tile8bpp([PaletteColor::TANSPARENT.into_storage().into(); 16]);
-    let style = PrimitiveStyle::with_stroke(PaletteColor::new(4), 1);
 
-    Circle::new(Point::new(3, 3), 3)
-        .into_styled(style)
+    for i in 1..=COLORS.len() {
+        let color = PaletteColor::new(i as u8);
+        egtriangle!(
+            points = [(0, 0), (7, 4), (4, 7)],
+            style = primitive_style!(stroke_color = color, fill_color = color, stroke_width = 1)
+        )
         .draw(&mut tile)?;
 
-    Line::new(Point::new(3, 0), Point::new(3, 6))
-        .into_styled(style)
-        .draw(&mut tile)?;
-
-    Line::new(Point::new(0, 3), Point::new(6, 3))
-        .into_styled(style)
-        .draw(&mut tile)?;
-
-    get_8bpp_character_block(5).index(1).write(tile);
+        get_8bpp_character_block(5).index(i).write(tile);
+    }
 
     Ok(())
 }
 
-fn move_reticle(x: u16, y: u16) {
+fn move_cursor(index: u16, x: u16, y: u16) {
     write_obj_attributes(
         0,
         ObjectAttributes {
-            attr0: OBJAttr0::new()
-                .with_row_coordinate(y - 3)
-                .with_is_8bpp(true),
-            attr1: OBJAttr1::new().with_col_coordinate(x - 3),
-            attr2: OBJAttr2::new().with_tile_id(514), // 8bpp tiles are even offset
+            attr0: OBJAttr0::new().with_row_coordinate(y).with_is_8bpp(true),
+            attr1: OBJAttr1::new().with_col_coordinate(x),
+            attr2: OBJAttr2::new().with_tile_id(514 + (index * 2)),
         },
     );
 }

@@ -10,8 +10,8 @@ embedded-graphics = "0.6.2"
 tinytga = { version = "0.3.2", features = ["graphics"] }
 
 [dev-dependencies]
-cargo-xbuild = "0.5"
-gbafix = "1.0"
+cargo-xbuild = "0.5.33"
+gbafix = "1.0.3"
 # cargo-make = "0.30" <- This breaks build by adding the use_std feature flag to memchr!
 
 [profile.release]
