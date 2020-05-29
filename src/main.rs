@@ -11,7 +11,7 @@ use core::convert::{Infallible, TryFrom, TryInto};
 
 use embedded_graphics::{
     egtriangle,
-    fonts::{Font12x16, Text},
+    fonts::{Font6x8, Text},
     image::Image,
     pixelcolor::Bgr555,
     prelude::*,
@@ -72,8 +72,8 @@ fn main(_argc: isize, _argv: *const *const u8) -> isize {
 
     debug!("Create display");
     let mut display = GbaDisplay;
-    draw_tga(&mut display).ok();
-    draw_text(&mut display).ok();
+    draw_background(&mut display).ok();
+    draw_hud(&mut display).ok();
 
     debug!("Enable interrupts");
     set_irq_handler(irq_handler);
@@ -96,6 +96,13 @@ fn main(_argc: isize, _argv: *const *const u8) -> isize {
 
         // read buttons input
         let input = read_key_input();
+
+        // clear
+        if input.start() {
+            draw_background(&mut display).ok();
+            draw_hud(&mut display).ok();
+            continue;
+        }
 
         // cycle cursor
         if input.b() {
@@ -134,19 +141,25 @@ extern "C" fn irq_handler(flags: IrqFlags) {
     }
 }
 
-fn draw_tga(display: &mut GbaDisplay) -> Result<(), Infallible> {
+fn draw_background(display: &mut GbaDisplay) -> Result<(), Infallible> {
     let tga = Tga::from_slice(include_bytes!("../assets/amy.tga")).unwrap();
     let image: Image<Tga, Bgr555> = Image::new(&tga, Point::zero());
     image.draw(display)?;
     Ok(())
 }
 
-fn draw_text(display: &mut GbaDisplay) -> Result<(), Infallible> {
-    Text::new("Dirty Fucking Amy", Point::new(20, 20))
-        .into_styled(TextStyle::new(Font12x16, Bgr555::CYAN))
+fn draw_hud(display: &mut GbaDisplay) -> Result<(), Infallible> {
+    Rectangle::new(Point::new(0, 0), Point::new(72, 24))
+        .into_styled(PrimitiveStyle::with_fill(Bgr555::WHITE))
         .draw(display)?;
-    Rectangle::new(Point::new(15, 15), Point::new(227, 39))
-        .into_styled(PrimitiveStyle::with_stroke(Bgr555::CYAN, 3))
+    Text::new("A: Draw", Point::new(1, 1))
+        .into_styled(TextStyle::new(Font6x8, Bgr555::RED))
+        .draw(display)?;
+    Text::new("B: Color", Point::new(1, 9))
+        .into_styled(TextStyle::new(Font6x8, Bgr555::GREEN))
+        .draw(display)?;
+    Text::new("Start: Clear", Point::new(1, 17))
+        .into_styled(TextStyle::new(Font6x8, Bgr555::BLUE))
         .draw(display)?;
     Ok(())
 }
